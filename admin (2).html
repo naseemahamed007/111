@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NasTech Admin – Orders Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--black:#0a0a0a;--white:#f5f5f0;--orange:#ff5c00;--green:#00ff87;--yellow:#ffd600;--cyan:#00e5ff;--red:#ff4444;--card:#141414;--border:rgba(255,255,255,.07)}
+    body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh}
+
+    /* LOGIN */
+    #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(255,92,0,.08) 0%,transparent 70%)}
+    .login-box{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:3rem;width:100%;max-width:400px;text-align:center}
+    .login-logo{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;margin-bottom:.4rem}
+    .login-logo span{color:var(--orange)}
+    .login-sub{font-size:.85rem;color:rgba(245,245,240,.4);margin-bottom:2rem}
+    .login-box input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:.9rem 1.2rem;color:var(--white);font-family:'DM Sans',sans-serif;font-size:.95rem;outline:none;margin-bottom:1rem;transition:border-color .2s}
+    .login-box input:focus{border-color:var(--orange)}
+    .login-btn{width:100%;background:var(--orange);color:#fff;border:none;padding:1rem;border-radius:12px;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;transition:background .2s}
+    .login-btn:hover{background:#e04e00}
+    .login-err{color:#ff4444;font-size:.82rem;margin-top:.8rem;display:none}
+
+    /* DASHBOARD */
+    #dashboard{display:none;min-height:100vh}
+    header{background:rgba(10,10,10,.95);border-bottom:1px solid var(--border);padding:1.2rem 2rem;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
+    .header-logo{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800}
+    .header-logo span{color:var(--orange)}
+    .header-right{display:flex;align-items:center;gap:1rem}
+    .live-badge{display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--green);background:rgba(0,255,135,.08);border:1px solid rgba(0,255,135,.2);padding:.35rem .8rem;border-radius:100px}
+    .live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 1.5s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .logout-btn{background:transparent;border:1px solid var(--border);color:rgba(245,245,240,.5);padding:.4rem 1rem;border-radius:8px;cursor:pointer;font-size:.82rem;transition:all .2s}
+    .logout-btn:hover{border-color:var(--orange);color:var(--orange)}
+
+    main{padding:2rem}
+
+    /* STATS */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
+    .stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;position:relative;overflow:hidden}
+    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+    .stat-label{font-size:.75rem;color:rgba(245,245,240,.4);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.6rem}
+    .stat-val{font-family:'Syne',sans-serif;font-size:2.2rem;font-weight:800}
+    .stat-sub{font-size:.75rem;color:rgba(245,245,240,.35);margin-top:.3rem}
+
+    /* FILTERS */
+    .filters{display:flex;gap:.8rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+    .filter-btn{background:transparent;border:1px solid var(--border);color:rgba(245,245,240,.5);padding:.4rem 1rem;border-radius:100px;cursor:pointer;font-size:.82rem;transition:all .2s;font-family:'DM Sans',sans-serif}
+    .filter-btn.active,.filter-btn:hover{background:var(--orange);border-color:var(--orange);color:#fff}
+    .search-box{flex:1;max-width:300px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:100px;padding:.45rem 1.2rem;color:var(--white);font-family:'DM Sans',sans-serif;font-size:.85rem;outline:none;transition:border-color .2s}
+    .search-box:focus{border-color:var(--orange)}
+    .search-box::placeholder{color:rgba(245,245,240,.3)}
+
+    /* TABLE */
+    .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden}
+    table{width:100%;border-collapse:collapse}
+    thead{background:rgba(255,255,255,.03)}
+    th{padding:1rem 1.2rem;text-align:left;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(245,245,240,.35);font-weight:500}
+    td{padding:1rem 1.2rem;border-top:1px solid var(--border);font-size:.88rem;vertical-align:top}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    .order-id{font-family:monospace;font-size:.78rem;color:var(--orange)}
+    .client-name{font-weight:500}
+    .client-email{font-size:.78rem;color:rgba(245,245,240,.4)}
+    .client-phone{font-size:.78rem;color:rgba(245,245,240,.4)}
+    .service-badge{display:inline-block;background:rgba(255,92,0,.1);color:var(--orange);border:1px solid rgba(255,92,0,.2);padding:.25rem .7rem;border-radius:100px;font-size:.72rem}
+    .budget-text{font-size:.82rem;color:rgba(245,245,240,.6)}
+    .timeline-text{font-size:.78rem;color:rgba(245,245,240,.5)}
+    .desc-text{font-size:.8rem;color:rgba(245,245,240,.5);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+    .date-text{font-size:.78rem;color:rgba(245,245,240,.4)}
+
+    .status-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .8rem;border-radius:100px;font-size:.72rem;font-weight:500;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+    .status-badge:hover{opacity:.8}
+    .status-new{background:rgba(255,214,0,.1);color:var(--yellow);border:1px solid rgba(255,214,0,.3)}
+    .status-contacted{background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.3)}
+    .status-inprogress{background:rgba(255,92,0,.1);color:var(--orange);border:1px solid rgba(255,92,0,.3)}
+    .status-completed{background:rgba(0,255,135,.1);color:var(--green);border:1px solid rgba(0,255,135,.3)}
+    .status-cancelled{background:rgba(255,68,68,.1);color:var(--red);border:1px solid rgba(255,68,68,.3)}
+
+    .action-btn{background:transparent;border:1px solid var(--border);color:rgba(245,245,240,.5);padding:.3rem .7rem;border-radius:6px;cursor:pointer;font-size:.75rem;transition:all .2s;margin-right:.3rem}
+    .action-btn:hover{border-color:var(--orange);color:var(--orange)}
+    .action-btn.del:hover{border-color:var(--red);color:var(--red)}
+
+    .empty-state{text-align:center;padding:5rem 2rem;color:rgba(245,245,240,.3)}
+    .empty-icon{font-size:3rem;margin-bottom:1rem}
+    .loading-state{text-align:center;padding:4rem;color:rgba(245,245,240,.4);font-size:.9rem}
+
+    /* MODAL */
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+    .modal-bg.open{display:flex}
+    .modal{background:#1a1a1a;border:1px solid var(--border);border-radius:24px;padding:2.5rem;max-width:550px;width:90%;max-height:80vh;overflow-y:auto}
+    .modal h3{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .modal-close{background:transparent;border:none;color:rgba(245,245,240,.4);font-size:1.3rem;cursor:pointer;transition:color .2s}
+    .modal-close:hover{color:var(--white)}
+    .modal-row{margin-bottom:1.2rem}
+    .modal-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(245,245,240,.35);margin-bottom:.4rem}
+    .modal-val{font-size:.95rem;color:rgba(245,245,240,.8);line-height:1.6}
+    .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .status-select{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--white);padding:.6rem 1rem;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;width:100%;cursor:pointer}
+    .save-btn{background:var(--orange);color:#fff;border:none;padding:.8rem 1.8rem;border-radius:10px;font-family:'Syne',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;transition:background .2s;margin-top:1rem}
+    .save-btn:hover{background:#e04e00}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:2rem;right:2rem;background:#1a1a1a;border:1px solid var(--border);border-radius:14px;padding:1rem 1.5rem;font-size:.88rem;z-index:999;transform:translateY(100px);opacity:0;transition:all .3s ease}
+    .toast.show{transform:translateY(0);opacity:1}
+    .toast.success{border-color:rgba(0,255,135,.3)}
+    .toast.error{border-color:rgba(255,68,68,.3)}
+
+    @media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr}.modal-grid{grid-template-columns:1fr}table{font-size:.8rem}th,td{padding:.7rem .8rem}}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Nas<span>Tech</span> Admin</div>
+    <div class="login-sub">Orders & Bookings Dashboard</div>
+    <input type="password" id="admin-pass" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')login()"/>
+    <button class="login-btn" onclick="login()">Access Dashboard →</button>
+    <div class="login-err" id="login-err">❌ Incorrect password</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <header>
+    <div class="header-logo">Nas<span>Tech</span> <span style="font-weight:400;color:rgba(245,245,240,.4);font-size:.9rem">Admin</span></div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div>Live Updates</div>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card" style="--accent:var(--yellow)"><div class="stat-label">New Orders</div><div class="stat-val" id="stat-new">—</div><div class="stat-sub">Awaiting contact</div></div>
+      <div class="stat-card" style="--accent:var(--orange)"><div class="stat-label">In Progress</div><div class="stat-val" id="stat-progress">—</div><div class="stat-sub">Active projects</div></div>
+      <div class="stat-card" style="--accent:var(--green)"><div class="stat-label">Completed</div><div class="stat-val" id="stat-done">—</div><div class="stat-sub">Total delivered</div></div>
+      <div class="stat-card" style="--accent:var(--cyan)"><div class="stat-label">Total Orders</div><div class="stat-val" id="stat-total">—</div><div class="stat-sub">All time</div></div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filters">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('new',this)">🟡 New</button>
+      <button class="filter-btn" onclick="setFilter('contacted',this)">🔵 Contacted</button>
+      <button class="filter-btn" onclick="setFilter('inprogress',this)">🟠 In Progress</button>
+      <button class="filter-btn" onclick="setFilter('completed',this)">🟢 Completed</button>
+      <input class="search-box" type="text" placeholder="🔍 Search by name, email, service..." oninput="renderTable()" id="search"/>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Client</th>
+            <th>Service</th>
+            <th>Budget</th>
+            <th>Timeline</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="orders-tbody">
+          <tr><td colspan="9" class="loading-state">⏳ Loading orders...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>Order Details <button class="modal-close" onclick="closeModal()">✕</button></h3>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ============================================================
+  // 🔧 REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
+  // ============================================================
+  const SUPABASE_URL = 'https://rabvhblraoarwefgpwdr.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhYnZoYmxyYW9hcndlZmdwd2RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1Njg4MTcsImV4cCI6MjA4MjE0NDgxN30.UpoFidxtbYHcSGEKOPj7NAPRoZ8ygJg_WVar8LwTTqc';
+  // ============================================================
+
+  // 🔑 SET YOUR ADMIN PASSWORD HERE
+  const ADMIN_PASSWORD = 'nastech2025';
+  // ============================================================
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let allOrders = [];
+  let activeFilter = 'all';
+
+  function login() {
+    const pass = document.getElementById('admin-pass').value;
+    if (pass === ADMIN_PASSWORD) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      loadOrders();
+      subscribeRealtime();
+    } else {
+      document.getElementById('login-err').style.display = 'block';
+    }
+  }
+
+  function logout() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('admin-pass').value = '';
+  }
+
+  async function loadOrders() {
+    const { data, error } = await db.from('bookings').select('*').order('created_at', { ascending: false });
+    if (error) { showToast('❌ Error loading orders', 'error'); return; }
+    allOrders = data || [];
+    updateStats();
+    renderTable();
+  }
+
+  function subscribeRealtime() {
+    db.channel('bookings-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          allOrders.unshift(payload.new);
+          showToast('🔔 New booking received! ' + payload.new.client_name, 'success');
+        } else if (payload.eventType === 'UPDATE') {
+          const idx = allOrders.findIndex(o => o.id === payload.new.id);
+          if (idx !== -1) allOrders[idx] = payload.new;
+        } else if (payload.eventType === 'DELETE') {
+          allOrders = allOrders.filter(o => o.id !== payload.old.id);
+        }
+        updateStats(); renderTable();
+      }).subscribe();
+  }
+
+  function updateStats() {
+    document.getElementById('stat-new').textContent = allOrders.filter(o=>o.status==='new').length;
+    document.getElementById('stat-progress').textContent = allOrders.filter(o=>o.status==='inprogress').length;
+    document.getElementById('stat-done').textContent = allOrders.filter(o=>o.status==='completed').length;
+    document.getElementById('stat-total').textContent = allOrders.length;
+  }
+
+  function setFilter(f, btn) {
+    activeFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+  }
+
+  function renderTable() {
+    const q = document.getElementById('search').value.toLowerCase();
+    let orders = allOrders;
+    if (activeFilter !== 'all') orders = orders.filter(o=>o.status===activeFilter);
+    if (q) orders = orders.filter(o =>
+      (o.client_name||'').toLowerCase().includes(q) ||
+      (o.email||'').toLowerCase().includes(q) ||
+      (o.service||'').toLowerCase().includes(q) ||
+      (o.order_id||'').toLowerCase().includes(q)
+    );
+
+    const tbody = document.getElementById('orders-tbody');
+    if (!orders.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📭</div><div>No orders found</div></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = orders.map(o => `
+      <tr>
+        <td><div class="order-id">${o.order_id||'—'}</div></td>
+        <td>
+          <div class="client-name">${esc(o.client_name)}</div>
+          <div class="client-email">${esc(o.email)}</div>
+          <div class="client-phone">${esc(o.phone||'')}</div>
+        </td>
+        <td><span class="service-badge">${esc(o.service)}</span></td>
+        <td><div class="budget-text">${esc(o.budget||'—')}</div></td>
+        <td><div class="timeline-text">${esc(o.timeline||'—')}</div></td>
+        <td><div class="desc-text" title="${esc(o.description)}" onclick="openModal(${o.id})">${esc(o.description||'—')}</div></td>
+        <td><span class="status-badge status-${o.status}" onclick="openModal(${o.id})">${statusLabel(o.status)}</span></td>
+        <td><div class="date-text">${formatDate(o.created_at)}</div></td>
+        <td>
+          <button class="action-btn" onclick="openModal(${o.id})">View</button>
+          <button class="action-btn del" onclick="deleteOrder(${o.id})">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function statusLabel(s) {
+    return {new:'🟡 New',contacted:'🔵 Contacted',inprogress:'🟠 In Progress',completed:'🟢 Completed',cancelled:'🔴 Cancelled'}[s] || s;
+  }
+
+  function formatDate(dt) {
+    if (!dt) return '—';
+    const d = new Date(dt);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '<br>' + d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function openModal(id) {
+    const o = allOrders.find(x=>x.id===id);
+    if (!o) return;
+    document.getElementById('modal-content').innerHTML = `
+      <div class="modal-grid">
+        <div class="modal-row"><div class="modal-label">Order ID</div><div class="modal-val" style="color:var(--orange);font-family:monospace">${esc(o.order_id)}</div></div>
+        <div class="modal-row"><div class="modal-label">Date</div><div class="modal-val">${new Date(o.created_at).toLocaleString()}</div></div>
+        <div class="modal-row"><div class="modal-label">Client Name</div><div class="modal-val">${esc(o.client_name)}</div></div>
+        <div class="modal-row"><div class="modal-label">Phone</div><div class="modal-val">${esc(o.phone||'—')}</div></div>
+        <div class="modal-row"><div class="modal-label">Email</div><div class="modal-val">${esc(o.email)}</div></div>
+        <div class="modal-row"><div class="modal-label">Service</div><div class="modal-val">${esc(o.service)}</div></div>
+        <div class="modal-row"><div class="modal-label">Budget</div><div class="modal-val">${esc(o.budget||'—')}</div></div>
+        <div class="modal-row"><div class="modal-label">Timeline</div><div class="modal-val">${esc(o.timeline||'—')}</div></div>
+      </div>
+      <div class="modal-row"><div class="modal-label">Project Description</div><div class="modal-val">${esc(o.description)}</div></div>
+      <div class="modal-row">
+        <div class="modal-label">Update Status</div>
+        <select class="status-select" id="status-select-${o.id}">
+          <option value="new" ${o.status==='new'?'selected':''}>🟡 New</option>
+          <option value="contacted" ${o.status==='contacted'?'selected':''}>🔵 Contacted</option>
+          <option value="inprogress" ${o.status==='inprogress'?'selected':''}>🟠 In Progress</option>
+          <option value="completed" ${o.status==='completed'?'selected':''}>🟢 Completed</option>
+          <option value="cancelled" ${o.status==='cancelled'?'selected':''}>🔴 Cancelled</option>
+        </select>
+        <button class="save-btn" onclick="updateStatus(${o.id})">Save Status</button>
+      </div>
+    `;
+    document.getElementById('modal-bg').classList.add('open');
+  }
+
+  function closeModal() { document.getElementById('modal-bg').classList.remove('open'); }
+
+  async function updateStatus(id) {
+    const val = document.getElementById(`status-select-${id}`).value;
+    const { error } = await db.from('bookings').update({ status: val }).eq('id', id);
+    if (error) { showToast('❌ Update failed', 'error'); return; }
+    const idx = allOrders.findIndex(o=>o.id===id);
+    if (idx !== -1) allOrders[idx].status = val;
+    updateStats(); renderTable(); closeModal();
+    showToast('✅ Status updated!', 'success');
+  }
+
+  async function deleteOrder(id) {
+    if (!confirm('Delete this order? This cannot be undone.')) return;
+    const { error } = await db.from('bookings').delete().eq('id', id);
+    if (error) { showToast('❌ Delete failed', 'error'); return; }
+    allOrders = allOrders.filter(o=>o.id!==id);
+    updateStats(); renderTable();
+    showToast('🗑️ Order deleted', 'success');
+  }
+
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `toast ${type} show`;
+    setTimeout(()=>t.className='toast', 4000);
+  }
+</script>
+</body>
+</html>
